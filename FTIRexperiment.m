@@ -106,7 +106,7 @@ classdef FTIRexperiment
             %approximated to nmax terms. The resulting function depends on
             %r,t, and D.
             %syntax: getDiffusionEquation(f,nmax)
-            syms r t u D C
+            syms a x u b C
             
             A = f.radius; % radius of disk
             %D = 1; % diffusion coeff?
@@ -120,9 +120,9 @@ classdef FTIRexperiment
                 c0(ii) = (C*2)/(j0(ii)*besselj(1,j0(ii)));
             end
             
-            u(r,t,D)=0;
+            u(a,b,x)=0;
             for ii = 1:nmax
-                u = u + c0(ii)*besselj(0,j0(ii)/A*r)*exp(-(j0(ii)/A)^2*D*t);
+                u = u + c0(ii)*besselj(0,j0(ii)/A*a)*exp(-(j0(ii)/A)^2*b*x);
             end
             u = -u+C;
         end
