@@ -5,12 +5,13 @@ classdef FTIRexperiment
         volume (:,1) double = 1 % must be in microliters
         pathLength (:,1) double = 12 % must be in micrometers
         radius (:,1) double % not part of constructor method
-        gasFactor (:,1) double = 0
         timeInterval (:,1) double = 0 % must be in seconds
+        gasFactor (1,1) double
         sample string = ""
         diffusionCoeff double = 0
         finalSpectrum double = 0 % to get the concentration at saturation
         finalConc double = 0 % concentration at saturation
+        fittedSpectra struct
     end
     methods
         function f = FTIRexperiment(data,freqAxis,volume,pathLength,timeInterval,sample)
@@ -119,35 +120,6 @@ classdef FTIRexperiment
             ylabel("Concentration (M)")
             hold off
         end
-        function model = uptakeModel(f,a0,k1,k2)
-            %y = a0*(1-k1/(k2-k1)*(exp(-k1*x)-exp(-k2*x))-exp(-k1*x));
-            model = a0*(1-k1/(k2-k1)*(exp(-k1*timeAxis(f))-exp(-k2*timeAxis(f)))-exp(-k1*timeAxis(f)));
-        end
-        function u = getDiffusionEquation(f,nmax)
-            %returns a symbolic function for the complex diffusion model
-            %approximated to nmax terms. The resulting function depends on
-            %r,t, and D.
-            %syntax: getDiffusionEquation(f,nmax)
-            syms a x u b C
-            
-            A = f.radius; % radius of disk
-            %D = 1; % diffusion coeff?
-            C = f.finalConc; % initial conc on outside
-            
-            j0 = besselzero(0,nmax,1); % get nmax zeros of 0th order bessel function of first kind
-            
-            % constants defined by boundary condition
-            c0 = zeros(1,nmax);
-            for ii = 1:nmax
-                c0(ii) = (C*2)/(j0(ii)*besselj(1,j0(ii)));
-            end
-            
-            u(a,b,x)=0;
-            for ii = 1:nmax
-                u = u + c0(ii)*besselj(0,j0(ii)/A*a)*exp(-(j0(ii)/A)^2*b*x);
-            end
-            u = -u+C;
-        end
         function f = getFinalConc(f)
             %baseline correction
             baseline = f.finalSpectrum - f.finalSpectrum(28375);
@@ -159,7 +131,7 @@ classdef FTIRexperiment
             CO2band = fixed(f.freqAxis(:,1) > 2290 & f.freqAxis(:,1) < 2390,:);
             f.finalConc = max(CO2band)./(1000*f.pathLength*1e-4);
         end
-        function out = gasLineFit(f,center,wg,wl,a1,a2,a3,c0,c1)
+        function f = gasLineFit(f,center,wg,wl,a1,a2,a3,c0,c1)
             
             n_spectra = size(f.data,2); % number of columns
             
@@ -225,6 +197,24 @@ classdef FTIRexperiment
                     warning('Spectrum %i did not converge!!! Results might not be trustworthy.',ii);
                 end
             end
+            f.fittedSpectra = out;
+        end
+        function concs = fittedConcOverTime(f)
+            n_spectra = numel(f.fittedSpectra);
+            OD = zeros(1,n_spectra);
+            for ii = 1:n_spectra
+                fobj = f.fittedSpectra(ii).fobj; % copy of the fit
+                fobj.a3 = 0; % set gas lines to zero
+                fobj.c0 = 0; % set the offset to zero
+                fobj.c1 = 0; % set the slope to zero
+                
+                % call the changed fit (we have to input a vector for it to treat it as an
+                % input value to evaluate the fit at)
+                temp = fobj([fobj.center fobj.center]);
+                OD(ii) = temp(1); %take the first value only (they are duplicates)
+            end
+            concs = OD./(1000*f.pathLength*1e-4);
+            
         end
     end
 end
