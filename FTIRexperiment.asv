@@ -186,17 +186,15 @@ classdef FTIRexperiment
             
             % set the fit range
             range1 = [2290 2390];
-            
+
             % fit each spectrum
             for ii = 1:n_spectra
                 
-                freq = flip(f.freqAxis);
-                s = flip(f.data(:,ii));
-                
+                freq = flip(f.freq
                 % update the fitting region (x and y)
-                ind1 = find(freq>=range1(1) & freq<range1(2));
-                x = freq(ind1);
-                ydata = s(ind1);
+                ind1 = find(freq(:,ii)>=range1(1) & freq(:,ii)<range1(2));
+                x = freq(ind1,ii);
+                ydata = s(ind1,ii);
                 
                 % do the fit
                 [fobj, G, O] = fit(x,ydata,ft);
@@ -218,13 +216,6 @@ classdef FTIRexperiment
             
             % stop the timer
             toc
-            
-            % check results
-            for ii = 1:n_spectra
-                if out(ii).O.exitflag < 1
-                    warning('Spectrum %i did not converge!!! Results might not be trustworthy.',ii);
-                end
-            end
         end
     end
 end
