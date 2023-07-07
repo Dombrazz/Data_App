@@ -1,16 +1,16 @@
 classdef FTIRexperiment
     properties
-        data double = 0
-        freqAxis (:,1) double = 0
+        data double
+        freqAxis (:,1) double
         volume (:,1) double = 1 % must be in microliters
         pathLength (:,1) double = 12 % must be in micrometers
         radius (:,1) double % not part of constructor method
         timeInterval (:,1) double = 0 % must be in seconds
-        gasFactor (1,1) double
+        gasFactor (1,1) double = 0
         sample string = ""
-        diffusionCoeff double = 0
-        finalSpectrum double = 0 % to get the concentration at saturation
-        finalConc double = 0 % concentration at saturation
+        diffusionCoeff double
+        finalSpectrum double % to get the concentration at saturation
+        finalConc double % concentration at saturation
         fittedSpectra struct
     end
     methods
@@ -120,16 +120,79 @@ classdef FTIRexperiment
             ylabel("Concentration (M)")
             hold off
         end
-        function f = getFinalConc(f)
-            %baseline correction
-            baseline = f.finalSpectrum - f.finalSpectrum(28375);
-            %gas line correction
-            %cd("Users/matthewliberatore/Library/CloudStorage/OneDrive-UniversityofPittsburgh/data/ftir_data/Matt/Gas Lines Ref")
-            wha = load("CO2_gas_lines.mat",'gasLines');
-            fixed = baseline-f.gasFactor.*wha.gasLines;
+        function f = getFinalConc(f,center,wg,wl,a1,a2,a3,c0,c1)
             
-            CO2band = fixed(f.freqAxis(:,1) > 2290 & f.freqAxis(:,1) < 2390,:);
-            f.finalConc = max(CO2band)./(1000*f.pathLength*1e-4);
+            %n_spectra = size(f.data,2); % number of columns
+            
+            %initial guess from inputs do this before calling function
+            sp = [center,wg,wl,a1,a2,a3,c0,c1];
+            %upper and lower bounds
+            lb = [2300, 0.5, 0.5,   0, 0.0,   0, -10, -1];
+            ub = [2400, 4,   4,   100, 0.2, inf,  10,  1];
+            
+            opts = fitoptions('Method','NonlinearLeastSquares',...
+                'Lower',lb,'Upper',ub,'StartPoint',sp);
+                %'Display','Iter');
+            ft = fittype(@(center,w_g,w_l,a1,a2,a3,c0,c1,w) co2GasLineFitFunction(w,center,w_g,w_l,a1,a2,a3,c0,c1),...
+                'independent',{'w'},'dependent','absorbance',...
+                'coefficients',{'center','w_g','w_l','a1','a2','a3','c0','c1'},...
+                'options',opts);
+            
+            %clear out
+            out = struct('x',[],'ydata',[],'yfit',[],'res',[],...
+                'fobj',[],'G',[],'O',[]);
+            
+            % start a timer
+            tic
+            
+            % set the fit range
+            range1 = [2290 2390];
+            
+            % fit each spectrum
+            
+            
+            freq = flip(f.freqAxis);
+            s = flip(f.finalSpectrum);
+            
+            % update the fitting region (x and y)
+            ind1 = find(freq>=range1(1) & freq<range1(2));
+            x = freq(ind1);
+            ydata = s(ind1);
+            
+            % do the fit
+            [fobj, G, O] = fit(x,ydata,ft);
+            
+            
+            % get fit result for plotting
+            yfit = fobj(x);
+            
+            % pack up the data and results
+            out.x = x;
+            out.ydata = ydata;
+            out.yfit = yfit;
+            out.res = ydata - yfit;
+            out.fobj = fobj;
+            out.G = G;
+            out.O = O;
+            
+            
+            
+            % stop the timer
+            toc
+            
+            % check results
+            
+            if out.O.exitflag < 1
+                warning('Spectrum did not converge!!! Results might not be trustworthy.');
+            end
+
+                temp = out.fobj;
+                fcn = co2GasLineFitFunction(out.x,...
+                    temp.center,temp.w_g,temp.w_l,temp.a1,temp.a2,0,0,0);
+                OD = max(fcn);
+
+            f.finalConc = OD./(1000*f.pathLength*1e-4);
+            
         end
         function f = gasLineFit(f,center,wg,wl,a1,a2,a3,c0,c1)
             
@@ -203,15 +266,10 @@ classdef FTIRexperiment
             n_spectra = numel(f.fittedSpectra);
             OD = zeros(1,n_spectra);
             for ii = 1:n_spectra
-                fobj = f.fittedSpectra(ii).fobj; % copy of the fit
-                fobj.a3 = 0; % set gas lines to zero
-                fobj.c0 = 0; % set the offset to zero
-                fobj.c1 = 0; % set the slope to zero
-                
-                % call the changed fit (we have to input a vector for it to treat it as an
-                % input value to evaluate the fit at)
-                temp = fobj([fobj.center fobj.center]);
-                OD(ii) = temp(1); %take the first value only (they are duplicates)
+                temp = f.fittedSpectra(ii).fobj;
+                fcn = co2GasLineFitFunction(f.fittedSpectra(ii).x,...
+                    temp.center,temp.w_g,temp.w_l,temp.a1,temp.a2,0,0,0);
+                OD(ii) = max(fcn);
             end
             concs = OD./(1000*f.pathLength*1e-4);
             

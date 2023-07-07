@@ -6,6 +6,7 @@ classdef FTIRexperiment
         pathLength (:,1) double = 12 % must be in micrometers
         radius (:,1) double % not part of constructor method
         timeInterval (:,1) double = 0 % must be in seconds
+        gasFactor (1,1) double
         sample string = ""
         diffusionCoeff double = 0
         finalSpectrum double = 0 % to get the concentration at saturation
@@ -120,11 +121,6 @@ classdef FTIRexperiment
             hold off
         end
         function f = getFinalConc(f)
-            %baseline correction
-            baseline = f.finalSpectrum - f.finalSpectrum(28375);
-            %gas line correction
-            %cd("Users/matthewliberatore/Library/CloudStorage/OneDrive-UniversityofPittsburgh/data/ftir_data/Matt/Gas Lines Ref")
-            wha = load("CO2_gas_lines.mat",'gasLines');
             fixed = baseline-f.gasFactor.*wha.gasLines;
             
             CO2band = fixed(f.freqAxis(:,1) > 2290 & f.freqAxis(:,1) < 2390,:);
@@ -199,25 +195,15 @@ classdef FTIRexperiment
             f.fittedSpectra = out;
         end
         function concs = fittedConcOverTime(f)
-            %bring the gas lines in
-            persistent gasLines gasLinesFreq
-            if isempty(gasLines)
-                m = load('CO2_gas_lines.mat');
-                gasLinesFreq = m.freq;
-                gasLines = m.gasLinesCorrected;
+            n_spectra = numel(f.fittedSpectra);
+            OD = zeros(1,n_spectra);
+            for ii = 1:n_spectra
+                temp = f.fittedSpectra(ii).fobj;
+                fcn = co2GasLineFitFunction(f.fittedSpectra(ii).x,...
+                    temp.center,temp.w_g,temp.w_l,temp.a1,temp.a2,0,0,0);
+                OD(ii) = max(fcn);
             end
-            
-            %extract the fitted data and get rid of the gas lines
-            stuff = zeros(numel(f.fittedSpectra(1).yfit),numel(f.fittedSpectra));
-            gasfactors = zeros(1,numel(f.fittedSpectra));
-            for ii = numel(f.fittedSpectra)
-                stuff(:,ii) = f.fittedSpectra(ii).yfit;
-                gasfactors(ii) = f.fittedSpectra(ii).fobj.a3;
-                stuff(:,ii) = stuff(:,ii)-gasfactors(ii)*m.gasLinesCorrected;
-            end
-            
-            %find the maxima and convert to concentration
-            concs = max(stuff,1)
+            concs = OD./(1000*f.pathLength*1e-4);
             
         end
     end
