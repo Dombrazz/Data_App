@@ -107,7 +107,7 @@ classdef FTIRexperiment
             % generates time axis for data in f depending on time interval
             % specified
             %syntax: timeAxis(f)
-            axis = (0:(size(f.data,2)-1)).*10;
+            axis = (0:(size(f.data,2)-1)).*f.timeInterval;
         end
         function plts = plotConcOverTime(f)
             %converts data in f to vector of concentration values of CO2
