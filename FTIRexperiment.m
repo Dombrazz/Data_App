@@ -25,54 +25,27 @@ classdef FTIRexperiment
                 f.radius = sqrt(f.volume*1e9/(pi*f.pathLength)); % returns radius in micrometers
             end
         end
-        function plts = plotSpectra(f,specNum,gasFactor)
+        function plts = plotSpectra(f,specNum)
             % plots the spectra for data f for specNum indices, w optional
             % gasFactor
             %syntax: plotSpectra(f,specNum,gasFactor)
             if numel(specNum) == 1
-                if nargin == 3
                     %find the indicies for the amount of spectra desired
                     spectraIndicies = zeros(1,specNum);
                     interval = floor(size(f.data,2)/specNum);
                     for ii = 0:specNum-1
                         spectraIndicies(ii+1) = 1+(ii*interval);
                     end
-                    if spectraIndicies(end) ~= size(f.data,2)
-                        spectraIndicies = [spectraIndicies size(f.data,2)];
-                    end
-                    %baseline correction
-                    baseline = f.data - f.data(28375,:);
-                    %gas line correction
-                    %cd("Users/matthewliberatore/Library/CloudStorage/OneDrive-UniversityofPittsburgh/data/ftir_data/Matt/Gas Lines Ref")
-                    wha = load("CO2_gas_lines.mat",'gasLines');
-                    fixed = baseline-gasFactor.*wha.gasLines;
-                elseif nargin == 2
-                    %find the indicies for the amount of spectra desired
-                    spectraIndicies = zeros(1,specNum);
-                    interval = floor(size(f.data,2)/specNum);
-                    for ii = 0:specNum-1
-                        spectraIndicies(ii+1) = 1+(ii*interval);
-                    end
-                    if spectraIndicies(end) ~= size(f.data,2)
-                        spectraIndicies = [spectraIndicies size(f.data,2)];
-                    end
+                    %if spectraIndicies(end) ~= size(f.data,2)
+                    %    spectraIndicies = [spectraIndicies size(f.data,2)];
+                    %end
                     %baseline correction
                     baseline = f.data - f.data(28375,:);
                     %gas line correction
                     %cd("Users/matthewliberatore/Library/CloudStorage/OneDrive-UniversityofPittsburgh/data/ftir_data/Matt/Gas Lines Ref")
                     wha = load("CO2_gas_lines.mat",'gasLines');
                     fixed = baseline-f.gasFactor.*wha.gasLines;
-                end
             elseif numel(specNum) > 1
-                if nargin == 3
-                    spectraIndicies = specNum;
-                    %baseline correction
-                    baseline = f.data - f.data(28375,:);
-                    %gas line correction
-                    %cd("Users/matthewliberatore/Library/CloudStorage/OneDrive-UniversityofPittsburgh/data/ftir_data/Matt/Gas Lines Ref")
-                    wha = load("CO2_gas_lines.mat",'gasLines');
-                    fixed = baseline-gasFactor.*wha.gasLines;
-                elseif nargin == 2
                     %find the indicies for the amount of spectra desired
                     spectraIndicies = specNum;
                     %baseline correction
@@ -81,7 +54,6 @@ classdef FTIRexperiment
                     %cd("Users/matthewliberatore/Library/CloudStorage/OneDrive-UniversityofPittsburgh/data/ftir_data/Matt/Gas Lines Ref")
                     wha = load("CO2_gas_lines.mat",'gasLines');
                     fixed = baseline-f.gasFactor.*wha.gasLines;
-                end
             end
             plts = plot(f.freqAxis(:,1),fixed(:,spectraIndicies));
             
